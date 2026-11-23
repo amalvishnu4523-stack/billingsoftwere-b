@@ -22,6 +22,11 @@ const COOKIE_OPTIONS = {
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
+// Helper: get refresh token from cookie OR request body (for cross-origin deployments)
+function getRefreshToken(req) {
+  return req.cookies[REFRESH_COOKIE] || req.body?.refreshToken || null;
+}
+
 export const setupController = asyncHandler(async (req, res) => {
   const user = await setupAdmin(req.body);
   sendSuccess(res, { user }, 'Admin account created successfully', 201);
@@ -30,21 +35,22 @@ export const setupController = asyncHandler(async (req, res) => {
 export const loginController = asyncHandler(async (req, res) => {
   const { user, tokens } = await loginUser(req.body);
   res.cookie(REFRESH_COOKIE, tokens.refreshToken, COOKIE_OPTIONS);
-  sendSuccess(res, { accessToken: tokens.accessToken, user }, 'Login successful');
+  // Also return refreshToken in body for cross-origin deployments where cookies are blocked
+  sendSuccess(res, { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, user }, 'Login successful');
 });
 
 export const refreshController = asyncHandler(async (req, res) => {
-  const refreshToken = req.cookies[REFRESH_COOKIE];
+  const refreshToken = getRefreshToken(req);
   if (!refreshToken) {
     return sendError(res, 'No refresh token', 401);
   }
   const tokens = await refreshAccessToken(refreshToken);
   res.cookie(REFRESH_COOKIE, tokens.refreshToken, COOKIE_OPTIONS);
-  sendSuccess(res, { accessToken: tokens.accessToken }, 'Token refreshed');
+  sendSuccess(res, { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken }, 'Token refreshed');
 });
 
 export const logoutController = asyncHandler(async (req, res) => {
-  const refreshToken = req.cookies[REFRESH_COOKIE];
+  const refreshToken = getRefreshToken(req);
   if (refreshToken) {
     try {
       const decoded = jwt.decode(refreshToken);
