@@ -18,9 +18,22 @@ const app = express();
 
 app.use(helmet());
 
+// Build allowed origins list — includes configured URLs plus all Vercel preview deployments
+const VERCEL_PATTERN = /^https:\/\/billingsoftwere-f[a-z0-9\-]*\.vercel\.app$/;
+
+function corsOrigin(origin, callback) {
+  // Allow requests with no origin (mobile apps, curl, Postman)
+  if (!origin) return callback(null, true);
+  // Allow any configured CLIENT_URL
+  if (config.clientUrls.includes(origin)) return callback(null, true);
+  // Allow all Vercel preview deployments for this project
+  if (VERCEL_PATTERN.test(origin)) return callback(null, true);
+  callback(new Error(`CORS: origin ${origin} not allowed`));
+}
+
 app.use(
   cors({
-    origin: config.clientUrls,
+    origin: corsOrigin,
     credentials: true,
   })
 );
